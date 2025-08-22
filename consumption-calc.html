@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"
+    defer>
+  </script>
+  <title>WRSR — Калькулятор потребления</title>
+  <style>
+    .form-label { color:#cbd5e1; }
+    .muted { color:#94a3b8; }
+    .value { font-variant-numeric: tabular-nums; }
+    .divider { height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); margin: .75rem 0 1rem; }
+    a, a:visited { color:#8bb9ff; }
+    .unit { font-size: .9rem; color:#9aa4b2; }
+    small a { text-decoration: underline dotted; }
+  </style>
+</head>
+<body data-bs-theme="dark">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-12 col-xl-10 col-xxl-8">
+        <div class="card shadow rounded-4">
+          <div class="card-body p-4 p-md-5">
+            <a href="index.html" class="text-decoration-none">
+              Назад
+            </a>
+            <h3 class="my-3">Калькулятор потребления</h3>
+
+            <p class="muted mb-4">Вводи население — расчёты обновляются автоматически. Учитывается погрешность и плодородие полей.</p>
+
+            <!-- Форма ввода -->
+            <div class="row g-3 align-items-end">
+              <div class="col-12 col-md-4">
+                <label class="form-label" for="popInput">Количество жителей</label>
+                <input id="popInput" type="number" min="0" step="1" class="form-control form-control-lg" placeholder="12000" value="12000" />
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label" for="fertInput">Плодородие полей (%)</label>
+                <input id="fertInput" type="number" min="10" max="200" step="1" class="form-control" value="100" />
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label" for="marginInput">Погрешность/запас (%)</label>
+                <input id="marginInput" type="number" min="0" max="100" step="1" class="form-control" value="10" />
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Итоги потребления товаров -->
+            <h2 class="h5">Потребление товаров</h2>
+            <p class="muted">На базе годовых норм на человека (см. источники ниже). Показаны суточные, месячные и годовые объёмы с учётом заданной погрешности.</p>
+            <div class="table-responsive">
+              <table class="table table-sm table-dark align-middle mb-2">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th class="text-end">в сутки <span class="unit">(т)</span></th>
+                    <th class="text-end">в месяц <span class="unit">(т)</span></th>
+                    <th class="text-end">в год <span class="unit">(т)</span></th>
+                  </tr>
+                </thead>
+                <tbody id="consumptionTable"></tbody>
+              </table>
+            </div>
+
+            <!-- Электричество -->
+            <h2 class="h5 mt-4">Электроэнергия</h2>
+            <p class="muted">Оценка бытового/городского спроса по норме <span class="value" id="elPerCap">6.0</span> МВт·ч/чел·год.</p>
+            <div class="row g-3">
+              <div class="col-12 col-lg-6">
+                <div class="p-3 border rounded-3">
+                  <div class="d-flex justify-content-between"><span>Сутки</span><span class="value" id="elDay">—</span> <span class="unit">МВт·ч/сутки</span></div>
+                  <div class="d-flex justify-content-between"><span>Месяц</span><span class="value" id="elMonth">—</span> <span class="unit">МВт·ч/мес</span></div>
+                  <div class="d-flex justify-content-between"><span>Год</span><span class="value" id="elYear">—</span> <span class="unit">МВт·ч/год</span></div>
+                  <div class="d-flex justify-content-between"><span>Средняя мощность</span><span class="value" id="elAvgMW">—</span> <span class="unit">МВт</span></div>
+                </div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="p-3 border rounded-3">
+                  <div class="fw-semibold mb-2">Эквивалент «стандартных ТЭЦ»</div>
+                  <div class="small muted mb-2">1 ТЭЦ: 24 т угля/сутки ⇒ 1400 МВт·ч/сутки (≈ 23 МВт·ч/игровой такт).</div>
+                  <div class="d-flex justify-content-between"><span>Нужно ТЭЦ</span><span class="value" id="elTPPs">—</span></div>
+                  <div class="d-flex justify-content-between"><span>Уголь в сутки</span><span class="value" id="coalDay">—</span> <span class="unit">т/сутки</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Зерно, поля, совхозы -->
+            <h2 class="h5 mt-4">Еда → зерно → поля → совхозы</h2>
+            <p class="muted">Food Factory потребляет 42 т зерна и производит 20 т еды в сутки при макс. производительности. Для расчётов используем коэффициент <span class="value">2.1</span> т зерна на 1 т еды. Урожайность большого поля: <span class="value" id="yieldPerField">300</span> т/год при 100% плодородии.</p>
+
+            <div class="table-responsive">
+              <table class="table table-sm table-dark align-middle mb-2">
+                <tbody>
+                  <tr>
+                    <td>Нужная еда (в сутки)</td>
+                    <td class="text-end"><span class="value" id="foodPerDay">—</span> <span class="unit">т</span></td>
+                  </tr>
+                  <tr>
+                    <td>Нужно зерна (в год) для этой еды</td>
+                    <td class="text-end"><span class="value" id="grainPerYear">—</span> <span class="unit">т</span></td>
+                  </tr>
+                  <tr>
+                    <td>Площадь полей</td>
+                    <td class="text-end"><span class="value" id="hectares">—</span> <span class="unit">га</span></td>
+                  </tr>
+                  <tr>
+                    <td>Больших полей (4.81 га)</td>
+                    <td class="text-end"><span class="value" id="bigFields">—</span> <span class="unit">шт</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-12 col-lg-6">
+                <div class="p-3 border rounded-3 h-100">
+                  <div class="fw-semibold mb-2">Совхозы (кластеры полей)</div>
+                  <div class="small muted mb-2">Исходим из 8 больших полей на один совхоз.</div>
+                  <div class="d-flex justify-content-between"><span>Совхозов нужно</span><span class="value" id="farms">—</span></div>
+                </div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="p-3 border rounded-3 h-100">
+                  <div class="fw-semibold mb-2">Техника на все совхозы</div>
+                  <div class="small muted mb-2">На 1 совхоз (≈8 полей): 4 комбайна, 3 сеялки/тракт., 6 грузовиков (покрытых), 2 разбрасывателя удобр., 1 трактор с плугом/культиватором.</div>
+                  <div class="d-flex justify-content-between"><span>Комбайны</span><span class="value" id="equipHarvesters">—</span></div>
+                  <div class="d-flex justify-content-between"><span>Тракторы</span><span class="value" id="equipSeeders">—</span></div>
+                  <div class="d-flex justify-content-between"><span>Крытые грузовики</span><span class="value" id="equipTrucks">—</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <small class="text-secondary d-block">
+              Данные примерные; сильно зависят от настроек, доступности товаров, графиков работы и логистики. Нормы потребления на человека взяты из обсуждений сообщества и вики WRSR:
+              <br />
+              • Steam Community: «Citizen consumption» (перс. нормы и сводка на ~109k жителей) — 
+              <a href="https://steamcommunity.com/app/784150/discussions/0/3454842150489701958/" target="_blank" rel="noopener">форум</a>
+              <br />
+              • WRSR Fandom: «Food Factory» (42 т зерна ⇒ 20 т еды/сутки), «Farming», «Water» и др. — 
+              <a href="https://workers-resources.fandom.com/wiki/Food_factory" target="_blank" rel="noopener">fandom</a>
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==== Константы (можно подправить под свой баланс/модпак) ====
+    const PER_CAPITA_YEAR = {
+      food: 0.150,        // т/чел·год — по сводной норме из Steam
+      meat: 0.032,        // т/чел·год — по сводной норме из Steam
+      clothes: 0.0046,    // т/чел·год — по сводной норме из Steam
+      alcohol: 0.0091,    // т/чел·год — из сводной статистики (109k жителей)
+      electronics: 0.00823// т/чел·год — из сводной статистики (109k жителей)
+    };
+
+    // Электричество: оценка бытового спроса
+    const EL_MWH_PER_CAPITA_YEAR = 6.0; // МВт·ч/чел·год (средняя оценка)
+
+    // Food Factory конверсия зерна в еду
+    const GRAIN_PER_TON_FOOD = 2.1; // т зерна на 1 т еды (42 -> 20)
+
+    // Урожайность (100% плодородие)
+    const FIELD_YIELD_TONS_PER_YEAR = 300; // т/год с большого поля 4.81 га
+    const BIG_FIELD_AREA_HA = 4.81;        // гектар
+
+    // Совхоз: поля на кластер и техника
+    const FIELDS_PER_FARM = 8; // больших полей на один совхоз
+    const EQUIP_PER_FARM = {
+      harvesters: 4,
+      seeders: 3,
+      trucks: 6,
+    };
+
+    // ==== Утилиты форматирования ====
+    const fmt = (x, d=2) => Number(x).toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const ceil = Math.ceil;
+
+    // ==== Расчёты ====
+    function recompute() {
+      const pop = Math.max(0, parseInt(document.getElementById('popInput').value || '0', 10));
+      const fertPct = Math.max(1, Math.min(200, parseFloat(document.getElementById('fertInput').value || '100')));
+      const marginPct = Math.max(0, Math.min(100, parseFloat(document.getElementById('marginInput').value || '0')));
+
+      const marginK = 1 + marginPct / 100;
+
+      // Потребление товаров (тонны)
+      const rows = [];
+      const goods = [
+        { key:'food', name:'Еда' },
+        { key:'meat', name:'Мясо' },
+        { key:'clothes', name:'Одежда' },
+        { key:'alcohol', name:'Алкоголь' },
+        { key:'electronics', name:'Электроника' }
+      ];
+
+      goods.forEach(g => {
+        const perYear = PER_CAPITA_YEAR[g.key] * pop * marginK; // т/год
+        const perDay = perYear / 365;
+        const perMonth = perYear / 12;
+        rows.push(`<tr>
+          <td>${g.name}</td>
+          <td class="text-end"><span class="value">${fmt(perDay)}</span></td>
+          <td class="text-end"><span class="value">${fmt(perMonth)}</span></td>
+          <td class="text-end"><span class="value">${fmt(perYear)}</span></td>
+        </tr>`);
+      });
+      document.getElementById('consumptionTable').innerHTML = rows.join('');
+
+      // Еда в сутки (для зерна/полей)
+      const foodPerYear = PER_CAPITA_YEAR.food * pop * marginK;
+      const foodPerDay = foodPerYear / 365; // т/сутки
+      document.getElementById('foodPerDay').textContent = fmt(foodPerDay);
+
+      // Нужное зерно в год
+      const grainPerYear = foodPerYear * GRAIN_PER_TON_FOOD; // т/год
+      document.getElementById('grainPerYear').textContent = fmt(grainPerYear);
+
+      // Поля (учёт плодородия)
+      const fertK = fertPct / 100; // 1.0 при 100%
+      const fieldYield = FIELD_YIELD_TONS_PER_YEAR * fertK; // т/год
+      const fieldsNeeded = fieldYield > 0 ? ceil(grainPerYear / fieldYield) : 0;
+      const hectares = fieldsNeeded * BIG_FIELD_AREA_HA;
+
+      document.getElementById('hectares').textContent = fmt(hectares);
+      document.getElementById('bigFields').textContent = fmt(fieldsNeeded, 0);
+
+      // Совхозы
+      const farms = fieldsNeeded > 0 ? ceil(fieldsNeeded / FIELDS_PER_FARM) : 0;
+      document.getElementById('farms').textContent = farms.toString();
+
+      // Техника
+      document.getElementById('equipHarvesters').textContent = (farms * EQUIP_PER_FARM.harvesters).toString();
+      document.getElementById('equipSeeders').textContent    = (farms * EQUIP_PER_FARM.seeders).toString();
+      document.getElementById('equipTrucks').textContent      = (farms * EQUIP_PER_FARM.trucks).toString();
+
+      // Электричество
+      const elYear = EL_MWH_PER_CAPITA_YEAR * pop * marginK; // МВт·ч/год
+      const elDay = elYear / 365;     // МВт·ч/сутки
+      const elMonth = elYear / 12;    // МВт·ч/мес
+      const elAvgMW = elDay / 24;     // средняя мощность в МВт
+
+      document.getElementById('elYear').textContent = fmt(elYear);
+      document.getElementById('elMonth').textContent = fmt(elMonth);
+      document.getElementById('elDay').textContent = fmt(elDay);
+      document.getElementById('elAvgMW').textContent = fmt(elAvgMW, 3);
+
+      // Эквивалент ТЭЦ
+      const TPP_MWH_PER_DAY = 1400; // из условия
+      const COAL_T_PER_TPP_DAY = 24; // из условия
+      const tpps = elDay > 0 ? Math.ceil(elDay / TPP_MWH_PER_DAY) : 0;
+      const coalDay = tpps * COAL_T_PER_TPP_DAY;
+      document.getElementById('elTPPs').textContent = tpps.toString();
+      document.getElementById('coalDay').textContent = fmt(coalDay, 0);
+    }
+
+    // События
+    ['popInput','fertInput','marginInput'].forEach(id => {
+      document.getElementById(id).addEventListener('input', recompute);
+      document.getElementById(id).addEventListener('change', recompute);
+    });
+
+    // Пересчёт при загрузке
+    window.addEventListener('DOMContentLoaded', recompute);
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
